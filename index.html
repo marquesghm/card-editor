@@ -933,11 +933,11 @@
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = "cards.pdf";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 600);
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank'); // abre em uma nova aba
+            // Opcional: depois de um tempo, liberar o objeto
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+
         };
 
         // --- Save/Load Project
