@@ -360,7 +360,14 @@
                     <select id="layout-dropdown"></select>
                     <button type="button" class="layout-add-btn" title="Add new layout" id="add-layout-btn">+</button>
                 </div>
-                <div id="layout-preview"></div>
+                <div style="margin-top:8px;">
+                    <div id="layout-preview-toggle"
+                        style="cursor:pointer;font-weight:bold;font-size:15px;display:flex;align-items:center;gap:6px;">
+                        <span id="layout-preview-arrow">&#9654;</span>
+                        Card Layout Preview
+                    </div>
+                    <div id="layout-preview" style="display:none;"></div>
+                </div>
             </div>
             <div class="sidebar-section">
                 <label>Card Size (mm)</label>
@@ -451,8 +458,17 @@
         const cutmarkThicknessInput = document.getElementById('cutmark-thickness');
         const layoutDropdown = document.getElementById('layout-dropdown');
         const addLayoutBtn = document.getElementById('add-layout-btn');
-        const layoutPreview = document.getElementById('layout-preview');
         const borderColorInput = document.getElementById('border-color');
+        const layoutPreviewToggle = document.getElementById('layout-preview-toggle');
+        const layoutPreviewArrow = document.getElementById('layout-preview-arrow');
+        const layoutPreview = document.getElementById('layout-preview');
+        let layoutPreviewOpen = false;
+
+        layoutPreviewToggle.addEventListener('click', () => {
+            layoutPreviewOpen = !layoutPreviewOpen;
+            layoutPreview.style.display = layoutPreviewOpen ? 'block' : 'none';
+            layoutPreviewArrow.textContent = layoutPreviewOpen ? '▼' : '▶';
+        });
 
         borderColorInput.addEventListener('input', e => {
             state.borderColor = e.target.value;
@@ -480,6 +496,9 @@
         layoutDropdown.addEventListener('change', function () {
             state.cardLayout = this.value;
             showLayoutPreview(state.cardLayout);
+            layoutPreviewOpen = true;
+            layoutPreview.style.display = 'block';
+            layoutPreviewArrow.textContent = '▼';
             updatePages();
         });
         addLayoutBtn.addEventListener('click', function () {
