@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Card Print App</title>
+    <meta name="viewport" content="width=1200, initial-scale=1">
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #fafafa;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            min-width: 100vw;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            width: 100vw;
+            background: #23272e;
+            color: #fff;
+            padding: 0;
+            box-sizing: border-box;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            box-shadow: 0 2px 5px #0002;
+            z-index: 10;
+        }
+
+        #header button {
+            background: #2e3240;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            margin: 0 10px;
+            padding: 8px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            outline: none;
+            transition: background 0.15s;
+        }
+
+        #header button:hover {
+            background: #5b5f71;
+        }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            justify-content: center;
+            height: calc(100vh - 54px);
+        }
+
+        #pages-area {
+            flex: 1;
+            overflow: auto;
+            background: #fafafa;
+            padding: 30px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .a4-sheet {
+            width: 297mm;
+            height: 210mm;
+            background: #fff;
+            position: relative;
+            box-sizing: border-box;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 12px #0001;
+            border: 1px solid #e6e6e6;
+        }
+
+        .inner-border {
+            width: 287mm;
+            height: 200mm;
+            border: 0.15mm solid #000;
+            box-sizing: border-box;
+            position: relative;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-grid {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: grid;
+            gap: 0;
+        }
+
+        .card-slot {
+            background: #ccc;
+            border: none;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            object-fit: contain;
+        }
+
+        .card-slot img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: fill !important;
+            display: block;
+        }
+
+        .cutmark {
+            position: absolute;
+            z-index: 10;
+        }
+
+        .cutmark.cross {
+            width: 4mm;
+            height: 4mm;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .cutmark.cross::before,
+        .cutmark.cross::after {
+            content: '';
+            position: absolute;
+            background: var(--cutmark-color, #000);
+        }
+
+        .cutmark.cross::before {
+            left: 50%;
+            top: 0;
+            width: var(--cutmark-thickness, 0.28mm);
+            height: 100%;
+            transform: translateX(-50%);
+        }
+
+        .cutmark.cross::after {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: var(--cutmark-thickness, 0.28mm);
+            transform: translateY(-50%);
+        }
+
+        .cutmark.line {
+            background: var(--cutmark-color, #000);
+        }
+
+        #sidebar {
+            width: 340px;
+            background: #212532;
+            color: #e4e7ee;
+            padding: 28px 22px 18px 22px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            box-shadow: -3px 0 16px #0001;
+            font-size: 15px;
+            min-width: 310px;
+        }
+
+        #sidebar label {
+            margin: 18px 0 5px 0;
+            font-weight: bold;
+        }
+
+        #sidebar input[type=number] {
+            width: 82px;
+            padding: 4px 7px;
+            margin-right: 6px;
+            border: 1px solid #7a7a88;
+            border-radius: 3px;
+            background: #292c38;
+            color: #e4e7ee;
+        }
+
+        #sidebar select,
+        #sidebar input[type="checkbox"] {
+            margin-right: 7px;
+        }
+
+        .image-preview-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin: 8px 0 8px 0;
+            max-height: 148px;
+            overflow-y: auto;
+            background: #191b23;
+            border-radius: 5px;
+            padding: 7px 3px;
+        }
+
+        .image-preview-list img {
+            width: 54px;
+            height: 54px;
+            object-fit: cover;
+            border: 2px solid #2c2e37;
+            border-radius: 4px;
+            background: #f0f0f0;
+        }
+
+        .image-preview-list .remove-btn {
+            display: block;
+            margin: 0 auto 2px auto;
+            padding: 1px 5px;
+            font-size: 13px;
+            background: #4a4c55;
+            color: #fff;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            margin-top: 1px;
+        }
+
+        #sidebar .card-size-controls {
+            display: flex;
+            gap: 7px;
+            margin-bottom: 3px;
+        }
+
+        #sidebar .card-size-controls input {
+            width: 56px;
+        }
+
+        #sidebar .desc {
+            font-size: 12px;
+            opacity: 0.65;
+            margin-top: -6px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 22px;
+            width: 100%;
+        }
+
+        .sidebar-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .sidebar-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            align-items: center;
+        }
+
+        .cutmark-toggle-checkbox {
+            position: absolute;
+            right: -34px;
+            top: 8px;
+            z-index: 11;
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 13px;
+            color: #23272e;
+            box-shadow: 0 0 5px #0002;
+            display: flex;
+            align-items: center;
+            user-select: none;
+        }
+
+        .cutmark-toggle-checkbox input {
+            margin-right: 5px;
+        }
+
+        #pages-area::-webkit-scrollbar {
+            display: none;
+        }
+
+        .layout-selector-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #layout-dropdown {
+            flex: 1;
+            border-radius: 18px;
+            padding: 4px 12px;
+            font-size: 15px;
+        }
+
+        .layout-add-btn {
+            background: #323a54;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            font-size: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px #0002;
+            transition: background 0.18s;
+        }
+
+        .layout-add-btn:hover {
+            background: #5870bf;
+        }
+
+        #layout-preview {
+            background: #fff;
+            margin: 10px 0 0 0;
+            border-radius: 8px;
+            border: 1px solid #2226;
+            min-height: 40px;
+            max-height: 160px;
+            overflow: auto;
+            padding: 7px 8px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+
+<body>
+    <div id="header">
+        <button id="btn-save">Save Project</button>
+        <button id="btn-load">Load Project</button>
+        <button id="btn-pdf">Export PDF</button>
+    </div>
+    <div id="main-content">
+        <div id="pages-area"></div>
+        <div id="sidebar">
+            <div class="sidebar-section">
+                <label>Card Images</label>
+                <input type="file" id="fronts-input" accept="image/*" multiple style="margin-bottom:6px">
+                <div class="image-preview-list" id="fronts-preview"></div>
+            </div>
+            <div class="sidebar-section">
+                <label>Card Layout</label>
+                <div class="layout-selector-wrap">
+                    <select id="layout-dropdown"></select>
+                    <button type="button" class="layout-add-btn" title="Add new layout" id="add-layout-btn">+</button>
+                </div>
+                <div id="layout-preview"></div>
+            </div>
+            <div class="sidebar-section">
+                <label>Card Size (mm)</label>
+                <div class="card-size-controls">
+                    <input type="number" min="20" max="287" step="0.1" id="card-width" value="56"> x
+                    <input type="number" min="20" max="200" step="0.1" id="card-height" value="87">
+                </div>
+                <div style="margin-top:8px;">
+                    <select id="card-size-preset">
+                        <option value="custom">Custom</option>
+                        <option value="63.5x88">63.5x88mm (Standard)</option>
+                        <option value="56x87">56x87mm (USA)</option>
+                        <option value="45x68">45x68mm (Mini Euro)</option>
+                        <option value="57.5x89">57.5x89mm (Chimera)</option>
+                        <option value="70x120">70x120mm (Tarot)</option>
+                        <option value="43.5x67.5">43.5x67.5mm (Mini Chimeuro)</option>
+                        <option value="41x63">41x63mm (Mini USA)</option>
+                        <option value="59x92">59x92mm (Euro)</option>
+                        <option value="80x120">80x120mm (Gold)</option>
+                        <option value="65x100">65x100mm (Copper)</option>
+                        <option value="43x65">43x65mm (Mini Chimera)</option>
+                        <option value="70x110">70x110mm (Silver)</option>
+                        <option value="61x112">61x112mm (Tarot Francês)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <label>Border Size (mm)</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="color" id="border-color" value="#000000"
+                        style="width:36px;height:36px;padding:0;border:none;">
+                    <div class="card-size-controls" style="margin-bottom:0;">
+                        <input type="number" min="20" max="297" step="0.1" id="border-width" value="287"> x
+                        <input type="number" min="20" max="210" step="0.1" id="border-height" value="200">
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <label>Cut Mark Type</label>
+                <select id="cutmark-type">
+                    <option value="cross">Cross</option>
+                    <option value="line">Continuous line</option>
+                </select>
+            </div>
+            <div class="sidebar-section">
+                <label>Cut Mark Color & Thickness</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="color" id="cutmark-color" value="#000000"
+                        style="width:36px;height:36px;padding:0;border:none;">
+                    <input type="number" id="cutmark-thickness" min="0.1" max="5" step="0.1" value="0.28"
+                        style="width:60px;"> mm
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Layouts
+        cardLayouts = [
+            { name: "Image Only", html: `<div style="width:100%;height:100%;"><img src="CARD_IMAGE" style="width:100%;height:100%;object-fit:fill;"></div>` }
+        ];
+
+        let state = {
+            fronts: [],
+            cardWidth: 56,
+            cardHeight: 87,
+            cutmarkType: "cross",
+            cutmarksVisible: [],
+            borderWidth: 287,
+            borderHeight: 200,
+            cutmarkColor: "#000000",
+            borderColor: "#000000",
+            cutmarkThickness: 0.28,
+            cardLayout: "Image Only"
+        };
+
+        // DOM refs
+        const frontsInput = document.getElementById('fronts-input');
+        const frontsPreview = document.getElementById('fronts-preview');
+        const cardWidthInput = document.getElementById('card-width');
+        const cardHeightInput = document.getElementById('card-height');
+        const cutmarkTypeInput = document.getElementById('cutmark-type');
+        const cardSizePreset = document.getElementById('card-size-preset');
+        const pagesArea = document.getElementById('pages-area');
+        const borderWidthInput = document.getElementById('border-width');
+        const borderHeightInput = document.getElementById('border-height');
+        const cutmarkColorInput = document.getElementById('cutmark-color');
+        const cutmarkThicknessInput = document.getElementById('cutmark-thickness');
+        const layoutDropdown = document.getElementById('layout-dropdown');
+        const addLayoutBtn = document.getElementById('add-layout-btn');
+        const layoutPreview = document.getElementById('layout-preview');
+        const borderColorInput = document.getElementById('border-color');
+
+        borderColorInput.addEventListener('input', e => {
+            state.borderColor = e.target.value;
+            updatePages();
+        });
+
+
+        // --- Layout Dropdown
+        function updateLayoutDropdown() {
+            layoutDropdown.innerHTML = "";
+            cardLayouts.forEach(layout => {
+                let opt = document.createElement('option');
+                opt.value = layout.name;
+                opt.textContent = layout.name;
+                layoutDropdown.appendChild(opt);
+            });
+            layoutDropdown.value = state.cardLayout;
+        }
+        function showLayoutPreview(name) {
+            let found = cardLayouts.find(l => l.name === name);
+            layoutPreview.innerHTML = found ?
+                `<div style="width:100%;height:120px;position:relative;overflow:auto;">${found.html.replace('CARD_IMAGE', 'https://dummyimage.com/300x420/eee/333&text=Image')}</div>` :
+                `<div style="color:#aaa;font-size:13px">No preview</div>`;
+        }
+        layoutDropdown.addEventListener('change', function () {
+            state.cardLayout = this.value;
+            showLayoutPreview(state.cardLayout);
+            updatePages();
+        });
+        addLayoutBtn.addEventListener('click', function () {
+            let inp = document.createElement('input');
+            inp.type = "file";
+            inp.accept = ".html,text/html";
+            inp.onchange = async (e) => {
+                if (!inp.files.length) return;
+                let file = inp.files[0];
+                let html = await file.text();
+                let name = file.name.replace(/\.[^/.]+$/, "");
+                let base = name, idx = 2;
+                while (cardLayouts.find(l => l.name === name)) name = base + " (" + idx++ + ")";
+                cardLayouts.push({ name, html });
+                updateLayoutDropdown();
+                layoutDropdown.value = name;
+                state.cardLayout = name;
+                showLayoutPreview(name);
+                updatePages();
+            };
+            inp.click();
+        });
+
+        // --- Initial layout dropdown
+        updateLayoutDropdown();
+        showLayoutPreview(state.cardLayout);
+
+        // --- Card size preset logic
+        cardSizePreset.addEventListener('change', function () {
+            if (this.value === "custom") return;
+            const [w, h] = this.value.split('x').map(Number);
+            cardWidthInput.value = w;
+            cardHeightInput.value = h;
+            state.cardWidth = w;
+            state.cardHeight = h;
+            updatePages();
+        });
+        function setCardPresetDropdown() {
+            const w = Number(cardWidthInput.value), h = Number(cardHeightInput.value);
+            let found = false;
+            for (let opt of cardSizePreset.options) {
+                if (opt.value === "custom") continue;
+                const [pw, ph] = opt.value.split('x').map(Number);
+                if (Math.abs(pw - w) < 0.01 && Math.abs(ph - h) < 0.01) {
+                    cardSizePreset.value = opt.value;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) cardSizePreset.value = "custom";
+        }
+        cardWidthInput.addEventListener('input', setCardPresetDropdown);
+        cardHeightInput.addEventListener('input', setCardPresetDropdown);
+
+        // --- Border inputs
+        borderWidthInput.addEventListener('input', e => {
+            let val = parseFloat(e.target.value) || 287;
+            state.borderWidth = Math.max(20, Math.min(val, 297));
+            updatePages();
+        });
+        borderHeightInput.addEventListener('input', e => {
+            let val = parseFloat(e.target.value) || 200;
+            state.borderHeight = Math.max(20, Math.min(val, 210));
+            updatePages();
+        });
+
+        // --- Cut mark color/thickness
+        cutmarkColorInput.addEventListener('input', e => {
+            state.cutmarkColor = e.target.value;
+            updatePages();
+        });
+        cutmarkThicknessInput.addEventListener('input', e => {
+            state.cutmarkThickness = parseFloat(e.target.value) || 0.28;
+            updatePages();
+        });
+
+        // --- Cut mark type
+        cutmarkTypeInput.addEventListener('change', e => {
+            state.cutmarkType = e.target.value;
+            updatePages();
+        });
+
+        // --- Card images load
+        async function filesToImages(files) {
+            const arr = [];
+            for (let f of files) {
+                let dataURL = await new Promise(res => {
+                    let r = new FileReader();
+                    r.onload = e => res(e.target.result);
+                    r.readAsDataURL(f);
+                });
+                arr.push({ name: f.name, dataURL });
+            }
+            return arr;
+        }
+        frontsInput.addEventListener('change', async (e) => {
+            let files = Array.from(e.target.files);
+            state.fronts = await filesToImages(files);
+            renderFrontsPreview();
+            updatePages();
+        });
+        function renderFrontsPreview() {
+            frontsPreview.innerHTML = "";
+            state.fronts.forEach((img, idx) => {
+                let div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.flexDirection = 'column';
+                div.style.alignItems = 'center';
+                let im = document.createElement('img');
+                im.src = img.dataURL;
+                im.title = img.name;
+                im.draggable = false;
+                div.appendChild(im);
+                let btn = document.createElement('button');
+                btn.textContent = 'Remove';
+                btn.className = 'remove-btn';
+                btn.onclick = () => { state.fronts.splice(idx, 1); renderFrontsPreview(); updatePages(); };
+                div.appendChild(btn);
+                frontsPreview.appendChild(div);
+            });
+        }
+
+        // --- Card size manual input
+        cardWidthInput.addEventListener('input', e => {
+            let val = parseFloat(e.target.value) || 56;
+            state.cardWidth = Math.max(20, Math.min(val, 297));
+            updatePages();
+        });
+        cardHeightInput.addEventListener('input', e => {
+            let val = parseFloat(e.target.value) || 87;
+            state.cardHeight = Math.max(20, Math.min(val, 210));
+            updatePages();
+        });
+
+        // --- Rendering pages
+        function updatePages() {
+            let fronts = state.fronts;
+            let nCards = fronts.length;
+            let cW = state.cardWidth;
+            let cH = state.cardHeight;
+            let pageW = state.borderWidth, pageH = state.borderHeight;
+            let cardsPerRow = Math.floor(pageW / cW);
+            let cardsPerCol = Math.floor(pageH / cH);
+            if (cardsPerRow < 1) cardsPerRow = 1;
+            if (cardsPerCol < 1) cardsPerCol = 1;
+            let cardsPerPage = cardsPerRow * cardsPerCol;
+            let totalPages = nCards === 0 ? 1 : Math.ceil(nCards / cardsPerPage);
+
+            if (!state.cutmarksVisible || state.cutmarksVisible.length !== totalPages) {
+                state.cutmarksVisible = Array(totalPages).fill(true);
+            }
+            pagesArea.innerHTML = '';
+            for (let p = 0; p < totalPages; ++p) {
+                let cardsForPage = fronts.slice(p * cardsPerPage, (p + 1) * cardsPerPage);
+
+                let pageDiv = document.createElement('div');
+                pageDiv.className = 'a4-sheet';
+                pageDiv.style.position = 'relative';
+
+                let cutbox = document.createElement('div');
+                cutbox.className = 'cutmark-toggle-checkbox';
+                let cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = state.cutmarksVisible[p];
+                cb.addEventListener('change', (e) => {
+                    state.cutmarksVisible[p] = cb.checked;
+                    updatePages();
+                });
+                cutbox.appendChild(cb);
+                let lb = document.createElement('span');
+                lb.textContent = 'Show cut marks';
+                cutbox.appendChild(lb);
+                pageDiv.appendChild(cutbox);
+
+                let borderDiv = document.createElement('div');
+                borderDiv.className = 'inner-border';
+                borderDiv.style.width = state.borderWidth + "mm";
+                borderDiv.style.height = state.borderHeight + "mm";
+                borderDiv.style.borderColor = state.borderColor || "#000000";
+
+                let grid = document.createElement('div');
+                grid.className = 'card-grid';
+                grid.style.width = (cardsPerRow * cW) + 'mm';
+                grid.style.height = (cardsPerCol * cH) + 'mm';
+                grid.style.gridTemplateColumns = `repeat(${cardsPerRow}, ${cW}mm)`;
+                grid.style.gridTemplateRows = `repeat(${cardsPerCol}, ${cH}mm)`;
+
+                grid.style.position = 'absolute';
+                grid.style.top = '50%';
+                grid.style.left = '50%';
+                grid.style.transform = 'translate(-50%,-50%)';
+
+                for (let i = 0; i < cardsPerRow * cardsPerCol; ++i) {
+                    let slot = document.createElement('div');
+                    slot.className = 'card-slot';
+                    slot.style.width = cW + 'mm';
+                    slot.style.height = cH + 'mm';
+
+                    // Render the selected card layout for each card
+                    if (cardsForPage[i]) {
+                        let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
+                        // Replace CARD_IMAGE with actual image
+                        let rendered = cardHtml.replace(/CARD_IMAGE/g, cardsForPage[i].dataURL);
+                        slot.innerHTML = rendered;
+                    }
+                    grid.appendChild(slot);
+                }
+                borderDiv.appendChild(grid);
+
+                if (state.cutmarksVisible[p]) {
+                    drawCutMarks(borderDiv, cardsPerRow, cardsPerCol, cW, cH, state.cutmarkType, state.cutmarkColor, state.cutmarkThickness);
+                }
+
+                pageDiv.appendChild(borderDiv);
+                pagesArea.appendChild(pageDiv);
+            }
+        }
+
+        function drawCutMarks(borderDiv, cols, rows, cW, cH, type, color, thickness) {
+            let startX = (state.borderWidth - cols * cW) / 2;
+            let startY = (state.borderHeight - rows * cH) / 2;
+            let positions = [];
+            for (let r = 0; r <= rows; ++r) {
+                for (let c = 0; c <= cols; ++c) {
+                    let x = startX + c * cW;
+                    let y = startY + r * cH;
+                    positions.push([x, y]);
+                }
+            }
+            if (type === "cross") {
+                for (let [x, y] of positions) {
+                    let m = document.createElement('div');
+                    m.className = 'cutmark cross';
+                    m.style.left = `calc(${x}mm)`;
+                    m.style.top = `calc(${y}mm)`;
+                    m.style.setProperty('--cutmark-color', color);
+                    m.style.setProperty('--cutmark-thickness', thickness + 'mm');
+                    borderDiv.appendChild(m);
+                }
+            }
+            else if (type === "line") {
+                for (let r = 0; r <= rows; ++r) {
+                    let y = startY + r * cH;
+                    let x1 = startX, x2 = startX + cols * cW;
+                    let l = document.createElement('div');
+                    l.className = 'cutmark line';
+                    l.style.left = `${x1}mm`;
+                    l.style.top = `${y - thickness / 2}mm`;
+                    l.style.width = `${cols * cW}mm`;
+                    l.style.height = `${thickness}mm`;
+                    l.style.background = color;
+                    borderDiv.appendChild(l);
+                }
+                for (let c = 0; c <= cols; ++c) {
+                    let x = startX + c * cW;
+                    let y1 = startY, y2 = startY + rows * cH;
+                    let l = document.createElement('div');
+                    l.className = 'cutmark line';
+                    l.style.left = `${x - thickness / 2}mm`;
+                    l.style.top = `${y1}mm`;
+                    l.style.width = `${thickness}mm`;
+                    l.style.height = `${rows * cH}mm`;
+                    l.style.background = color;
+                    borderDiv.appendChild(l);
+                }
+            }
+        }
+
+        // --- PDF Export (corrigido)
+        function dataURLToUint8Array(dataURL) {
+            let arr = dataURL.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while (n--) u8arr[n] = bstr.charCodeAt(n);
+            return u8arr;
+        }
+
+        async function safeDataURLtoBytes(dataURL) {
+            // Tenta fetch, se falhar, faz conversão manual
+            let bytes;
+            try {
+                bytes = await fetch(dataURL).then(r => r.arrayBuffer());
+            } catch (e) {
+                bytes = undefined;
+            }
+            if (!bytes) {
+                // Fallback manual sempre funciona
+                let arr = dataURL.split(',');
+                if (arr.length === 2) {
+                    let bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+                    while (n--) u8arr[n] = bstr.charCodeAt(n);
+                    bytes = u8arr;
+                }
+            }
+            return bytes;
+        }
+
+        document.getElementById('btn-pdf').onclick = async function exportAsPDF() {
+            if (!state.fronts.length) {
+                alert("Please upload card images before exporting PDF.");
+                return;
+            }
+            const { PDFDocument, rgb } = PDFLib;
+            const pdfDoc = await PDFDocument.create();
+            const A4_WIDTH_MM = 297, A4_HEIGHT_MM = 210;
+            const pageWPt = A4_WIDTH_MM * 2.83465;
+            const pageHPt = A4_HEIGHT_MM * 2.83465;
+            const borderWPt = state.borderWidth * 2.83465;
+            const borderHPt = state.borderHeight * 2.83465;
+            const borderX = ((A4_WIDTH_MM - state.borderWidth) / 2) * 2.83465;
+            const borderY = ((A4_HEIGHT_MM - state.borderHeight) / 2) * 2.83465;
+            const cW = state.cardWidth;
+            const cH = state.cardHeight;
+            const cardWPt = cW * 2.83465;
+            const cardHPt = cH * 2.83465;
+            const cardsPerRow = Math.floor(state.borderWidth / cW);
+            const cardsPerCol = Math.floor(state.borderHeight / cH);
+            const cardsPerPage = cardsPerRow * cardsPerCol;
+            const totalPages = Math.ceil(state.fronts.length / cardsPerPage);
+
+            function hexToRgbNorm(hex) {
+                hex = hex.replace(/^#/, '');
+                if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+                const num = parseInt(hex, 16);
+                return [
+                    ((num >> 16) & 255) / 255,
+                    ((num >> 8) & 255) / 255,
+                    (num & 255) / 255
+                ];
+            }
+            const borderRgb = rgb(...hexToRgbNorm(state.borderColor));
+            const cutColor = rgb(...hexToRgbNorm(state.cutmarkColor));
+            const cutThickPt = (state.cutmarkThickness || 0.28) * 2.83465;
+
+            for (let pageIndex = 0; pageIndex < totalPages; ++pageIndex) {
+                const page = pdfDoc.addPage([pageWPt, pageHPt]);
+                page.drawRectangle({
+                    x: borderX, y: borderY,
+                    width: borderWPt, height: borderHPt,
+                    borderColor: borderRgb, borderWidth: 0.43,
+                    color: rgb(1, 1, 1),
+                    opacity: 1
+                });
+                const x0 = borderX + (borderWPt - cardsPerRow * cardWPt) / 2;
+                const y0 = borderY + (borderHPt - cardsPerCol * cardHPt) / 2;
+
+                for (let i = 0; i < cardsPerPage; ++i) {
+                    const globalIdx = pageIndex * cardsPerPage + i;
+                    if (globalIdx >= state.fronts.length) break;
+                    const imgObj = state.fronts[globalIdx];
+                    const row = Math.floor(i / cardsPerRow);
+                    const col = i % cardsPerRow;
+                    const x = x0 + col * cardWPt;
+                    const y = y0 + (cardsPerCol - row - 1) * cardHPt;
+
+                    let imgBytes, imgEmbed;
+                    if (state.cardLayout === "Image Only") {
+                        let imgBytes = await safeDataURLtoBytes(imgObj.dataURL);
+                        if (!imgBytes) {
+                            alert("Failed to load card image for PDF.");
+                            continue;
+                        }
+                        if (imgObj.dataURL.startsWith('data:image/png')) {
+                            imgEmbed = await pdfDoc.embedPng(imgBytes);
+                        } else if (imgObj.dataURL.startsWith('data:image/jpeg') || imgObj.dataURL.startsWith('data:image/jpg')) {
+                            imgEmbed = await pdfDoc.embedJpg(imgBytes);
+                        } else {
+                            imgEmbed = await pdfDoc.embedPng(imgBytes);
+                        }
+
+                    } else {
+                        let temp = document.createElement('div');
+                        temp.style.width = cW + 'mm';
+                        temp.style.height = cH + 'mm';
+                        temp.style.position = 'absolute';
+                        temp.style.left = '-10000px';
+                        temp.style.top = '0';
+                        temp.style.background = '#fff';
+                        let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
+                        temp.innerHTML = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
+                        document.body.appendChild(temp);
+                        let canvas = await html2canvas(temp, { backgroundColor: "#fff", width: temp.offsetWidth, height: temp.offsetHeight, scale: 4 });
+                        let dataUrl = canvas.toDataURL("image/png");
+                        document.body.removeChild(temp);
+                        let imgBytes = await safeDataURLtoBytes(dataUrl);
+                        if (!imgBytes) {
+                            alert("Failed to generate image for PDF.");
+                            continue;
+                        }
+                        imgEmbed = await pdfDoc.embedPng(imgBytes);
+                    }
+                    page.drawImage(imgEmbed, {
+                        x: x,
+                        y: y,
+                        width: cardWPt,
+                        height: cardHPt,
+                        opacity: 1
+                    });
+                }
+
+                // --- Cut marks PDF
+                if (state.cutmarksVisible[pageIndex]) {
+                    let startX = borderX + ((state.borderWidth - cardsPerRow * cW) / 2) * 2.83465;
+                    let startY = borderY + ((state.borderHeight - cardsPerCol * cH) / 2) * 2.83465;
+                    let positions = [];
+                    for (let r = 0; r <= cardsPerCol; ++r) {
+                        for (let c = 0; c <= cardsPerRow; ++c) {
+                            let xx = startX + c * cardWPt;
+                            let yy = startY + r * cardHPt;
+                            positions.push([xx, yy]);
+                        }
+                    }
+                    if (state.cutmarkType === "cross") {
+                        for (let [xx, yy] of positions) {
+                            page.drawLine({
+                                start: { x: xx, y: yy - 2.5 },
+                                end: { x: xx, y: yy + 2.5 },
+                                thickness: cutThickPt,
+                                color: cutColor,
+                            });
+                            page.drawLine({
+                                start: { x: xx - 2.5, y: yy },
+                                end: { x: xx + 2.5, y: yy },
+                                thickness: cutThickPt,
+                                color: cutColor,
+                            });
+                        }
+                    } else if (state.cutmarkType === "line") {
+                        for (let r = 0; r <= cardsPerCol; ++r) {
+                            let yy = startY + r * cardHPt;
+                            let xx1 = startX, xx2 = startX + cardsPerRow * cardWPt;
+                            page.drawLine({
+                                start: { x: xx1, y: yy },
+                                end: { x: xx2, y: yy },
+                                thickness: cutThickPt,
+                                color: cutColor,
+                            });
+                        }
+                        for (let c = 0; c <= cardsPerRow; ++c) {
+                            let xx = startX + c * cardWPt;
+                            let yy1 = startY, yy2 = startY + cardsPerCol * cardHPt;
+                            page.drawLine({
+                                start: { x: xx, y: yy1 },
+                                end: { x: xx, y: yy2 },
+                                thickness: cutThickPt,
+                                color: cutColor,
+                            });
+                        }
+                    }
+                }
+            }
+
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "cards.pdf";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 600);
+        };
+
+        // --- Save/Load Project
+        function dataURLToBlob(dataURL) {
+            let [head, body] = dataURL.split(',');
+            let m = head.match(/:(.*?);/);
+            let mime = m ? m[1] : "image/png";
+            let bin = atob(body);
+            let arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; ++i) arr[i] = bin.charCodeAt(i);
+            return new Blob([arr], { type: mime });
+        }
+        function blobToDataURL(blob) {
+            return new Promise(res => {
+                let r = new FileReader();
+                r.onload = e => res(e.target.result);
+                r.readAsDataURL(blob);
+            });
+        }
+
+        document.getElementById('btn-save').onclick = async function () {
+            let zip = new JSZip();
+            let data = {
+                cardWidth: state.cardWidth,
+                cardHeight: state.cardHeight,
+                cutmarkType: state.cutmarkType,
+                cutmarkColor: state.cutmarkColor,
+                cutmarkThickness: state.cutmarkThickness,
+                borderWidth: state.borderWidth,
+                borderHeight: state.borderHeight,
+                cardLayout: state.cardLayout,
+                borderColor: state.borderColor,
+                fronts: state.fronts.map(f => ({ name: f.name, file: `fronts/${f.name}` })),
+                layouts: cardLayouts.map(l => ({ name: l.name, file: `layouts/${l.name}.html` })),
+            };
+            zip.file("project.json", JSON.stringify(data));
+            for (let f of state.fronts) {
+                zip.file(`fronts/${f.name}`, dataURLToBlob(f.dataURL));
+            }
+            for (let l of cardLayouts) {
+                zip.file(`layouts/${l.name}.html`, l.html);
+            }
+            let content = await zip.generateAsync({ type: "blob" });
+            let a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = "card-project.zip";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 500);
+        };
+
+        document.getElementById('btn-load').onclick = async function () {
+            let inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = ".zip,application/zip";
+            inp.onchange = async (e) => {
+                if (e.target.files.length === 0) return;
+                let file = e.target.files[0];
+                let zip = await JSZip.loadAsync(file);
+                let jsonText = await zip.file("project.json").async("text");
+                let data = JSON.parse(jsonText);
+                let fronts = [];
+                for (let f of data.fronts) {
+                    let blob = await zip.file(f.file).async("blob");
+                    let dataURL = await blobToDataURL(blob);
+                    fronts.push({ name: f.name, dataURL });
+                }
+                state.fronts = fronts;
+                state.cardWidth = data.cardWidth;
+                state.cardHeight = data.cardHeight;
+                state.cutmarkType = data.cutmarkType || "cross";
+                state.cutmarkColor = data.cutmarkColor || "#000000";
+                state.cutmarkThickness = data.cutmarkThickness || 0.28;
+                state.borderWidth = data.borderWidth || 287;
+                state.borderHeight = data.borderHeight || 200;
+                state.cardLayout = data.cardLayout || "Image Only";
+
+                // Atualize os inputs DOM para refletir os novos valores:
+                cardWidthInput.value = state.cardWidth;
+                cardHeightInput.value = state.cardHeight;
+                cutmarkTypeInput.value = state.cutmarkType;
+                cutmarkColorInput.value = state.cutmarkColor;
+                cutmarkThicknessInput.value = state.cutmarkThickness;
+                borderWidthInput.value = state.borderWidth;
+                borderHeightInput.value = state.borderHeight;
+
+                state.borderColor = data.borderColor || "#000000";
+                borderColorInput.value = state.borderColor;
+
+
+                // *** Aqui está o segredo para atualizar corretamente o preset ***
+                setCardPresetDropdown();
+
+                // Atualize layouts customizados normalmente
+                cardLayouts = [{ name: "Image Only", html: `<div style="width:100%;height:100%;"><img src="CARD_IMAGE" style="width:100%;height:100%;object-fit:fill;"></div>` }];
+                if (data.layouts) {
+                    for (let l of data.layouts) {
+                        if (l.name === "Image Only") continue;
+                        let html = await zip.file(l.file).async("text");
+                        cardLayouts.push({ name: l.name, html });
+                    }
+                }
+                updateLayoutDropdown();
+                layoutDropdown.value = state.cardLayout;
+                showLayoutPreview(state.cardLayout);
+                renderFrontsPreview();
+                updatePages();
+            };
+            inp.click();
+        };
+
+
+        // --- Render inicial
+        renderFrontsPreview();
+        updatePages();
+    </script>
+</body>
+
+</html>
