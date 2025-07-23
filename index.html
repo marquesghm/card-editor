@@ -900,6 +900,17 @@
             return bytes;
         }
 
+        async function urlToBase64(url) {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
         document.getElementById('btn-pdf').onclick = async function exportAsPDF() {
             if (!state.fronts.length) {
                 alert("Please upload card images before exporting PDF.");
@@ -991,7 +1002,32 @@
                             temp.style.top = '0';
                             temp.style.background = '#fff';
                             let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
-                            temp.innerHTML = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
+                            cardHtml = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
+
+                            // Substitui todas as <img src="URL_HTTP"> externas por base64:
+                            const imgRegex = /<img([^>]+)src=['"]([^'"]+)['"]([^>]*)>/gi;
+                            const externalImgs = [];
+                            let match;
+                            while ((match = imgRegex.exec(cardHtml)) !== null) {
+                                const url = match[2];
+                                if (url.startsWith('http')) {
+                                    externalImgs.push({ full: match[0], url });
+                                }
+                            }
+
+                            for (const ext of externalImgs) {
+                                try {
+                                    const base64 = await urlToBase64(ext.url);
+                                    const imgTagBase64 = ext.full.replace(ext.url, base64);
+                                    cardHtml = cardHtml.replace(ext.full, imgTagBase64);
+                                } catch (e) {
+                                    // Se não conseguir carregar, pode remover ou ignorar
+                                    cardHtml = cardHtml.replace(ext.full, '');
+                                }
+                            }
+
+                            temp.innerHTML = cardHtml;
+
                             document.body.appendChild(temp);
                             let canvas = await html2canvas(temp, { backgroundColor: "#fff", width: temp.offsetWidth, height: temp.offsetHeight, scale: 4 });
                             let dataUrl = canvas.toDataURL("image/png");
