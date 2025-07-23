@@ -390,6 +390,10 @@
                 <div class="image-preview-list" id="fronts-preview"></div>
             </div>
             <div class="sidebar-section">
+                <div id="csv-upload-section" class="sidebar-section" style="display:none;">
+                    <label>Card Data (Optional)</label>
+                    <input type="file" id="csv-input" accept=".csv,text/csv">
+                </div>
                 <label>Card Layout</label>
                 <div class="layout-selector-wrap">
                     <select id="layout-dropdown"></select>
@@ -409,10 +413,6 @@
                         Card Layout Preview
                     </div>
                     <div id="layout-preview" style="display:none;"></div>
-                </div>
-                <div id="csv-upload-section" class="sidebar-section" style="display:none;">
-                    <label>Card Data (CSV)</label>
-                    <input type="file" id="csv-input" accept=".csv,text/csv">
                 </div>
             </div>
             <div class="sidebar-section">
@@ -556,6 +556,7 @@
                 layoutDropdown.appendChild(opt);
             });
             layoutDropdown.value = state.cardLayout;
+            updateCSVInputVisibility();
         }
         function showLayoutPreview(name) {
             let found = cardLayouts.find(l => l.name === name);
@@ -566,6 +567,7 @@
         layoutDropdown.addEventListener('change', function () {
             state.cardLayout = this.value;
             showLayoutPreview(state.cardLayout);
+            updateCSVInputVisibility();
             layoutPreviewOpen = true;
             layoutPreview.style.display = 'block';
             layoutPreviewArrow.textContent = '▼';
@@ -587,6 +589,7 @@
                 updateLayoutDropdown();
                 layoutDropdown.value = name;
                 state.cardLayout = name;
+                updateCSVInputVisibility();
                 showLayoutPreview(name);
                 updatePages();
             };
@@ -784,6 +787,8 @@
             state.cardHeight = Math.max(20, Math.min(val, 210));
             updatePages();
         });
+
+        cardSizePreset.value = "56x87"; // Default preset
 
         // --- Rendering pages
         function updatePages() {
@@ -1307,7 +1312,7 @@
 
         // Adiciona input de CSV quando layout com data-field é selecionado
         function updateCSVInputVisibility() {
-            let hasDataField = true;
+            let hasDataField = true; //false
             let html = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
             if (html.includes('data-field="')) hasDataField = true;
             document.getElementById('csv-upload-section').style.display = hasDataField ? "block" : "none";
