@@ -705,6 +705,7 @@
             renderFrontsPreview();
             updatePages();
         });
+
         function renderFrontsPreview() {
             frontsPreview.innerHTML = "";
             state.fronts.forEach((img, idx) => {
@@ -712,19 +713,57 @@
                 div.style.display = 'flex';
                 div.style.flexDirection = 'column';
                 div.style.alignItems = 'center';
+                div.draggable = true;
+                div.style.cursor = "grab";
+                div.dataset.index = idx;
+
+                // Evento dragstart
+                div.addEventListener('dragstart', function (e) {
+                    e.dataTransfer.setData("cardIndex", idx);
+                    div.style.opacity = 0.5;
+                });
+                // Evento dragend
+                div.addEventListener('dragend', function () {
+                    div.style.opacity = 1;
+                });
+                // Permitir drop sobre qualquer card
+                div.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                    div.style.border = '2px solid #5870bf';
+                });
+                div.addEventListener('dragleave', function () {
+                    div.style.border = '';
+                });
+                div.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    div.style.border = '';
+                    const fromIdx = Number(e.dataTransfer.getData("cardIndex"));
+                    const toIdx = Number(div.dataset.index);
+                    if (fromIdx !== toIdx) {
+                        // Rearranjar a ordem no array
+                        const moved = state.fronts.splice(fromIdx, 1)[0];
+                        state.fronts.splice(toIdx, 0, moved);
+                        renderFrontsPreview();
+                        updatePages();
+                    }
+                });
+
                 let im = document.createElement('img');
                 im.src = img.dataURL;
                 im.title = img.name;
                 im.draggable = false;
                 div.appendChild(im);
+
                 let btn = document.createElement('button');
                 btn.textContent = 'Remove';
                 btn.className = 'remove-btn';
                 btn.onclick = () => { state.fronts.splice(idx, 1); renderFrontsPreview(); updatePages(); };
                 div.appendChild(btn);
+
                 frontsPreview.appendChild(div);
             });
         }
+
 
         // --- Card size manual input
         cardWidthInput.addEventListener('input', e => {
