@@ -295,6 +295,12 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .layout-btn-group {
+            display: flex;
+            gap: 3px;
         }
 
         #layout-dropdown {
@@ -322,6 +328,35 @@
 
         .layout-add-btn:hover {
             background: #5870bf;
+        }
+
+        .layout-edit-btn,
+        .layout-del-btn {
+            background: #323a54;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 3px;
+            box-shadow: 0 2px 6px #0002;
+            transition: background 0.18s;
+        }
+
+        .layout-edit-btn:hover,
+        .layout-del-btn:hover {
+            background: #e8a12d;
+            color: #111;
+        }
+
+        .layout-del-btn:hover {
+            background: #cc3838;
+            color: #fff;
         }
 
         #layout-preview {
@@ -358,7 +393,14 @@
                 <label>Card Layout</label>
                 <div class="layout-selector-wrap">
                     <select id="layout-dropdown"></select>
-                    <button type="button" class="layout-add-btn" title="Add new layout" id="add-layout-btn">+</button>
+                    <div class="layout-btn-group">
+                        <button type="button" class="layout-add-btn" title="Add new layout"
+                            id="add-layout-btn">+</button>
+                        <button type="button" class="layout-edit-btn" title="Edit layout name"
+                            id="edit-layout-btn">&#9998;</button>
+                        <button type="button" class="layout-del-btn" title="Delete layout"
+                            id="del-layout-btn">&#128465;</button>
+                    </div>
                 </div>
                 <div style="margin-top:8px;">
                     <div id="layout-preview-toggle"
@@ -424,6 +466,18 @@
             </div>
         </div>
     </div>
+    <div id="pdf-progress-container"
+        style="position:fixed;left:0;top:0;width:100vw;height:100vh;display:none;align-items:center;justify-content:center;z-index:9999;background:rgba(30,32,40,0.35);">
+        <div
+            style="background:#212532;padding:32px 32px 22px 32px;border-radius:14px;min-width:330px;box-shadow:0 8px 36px #0003;">
+            <div style="font-size:17px;font-weight:bold;color:#e4e7ee;margin-bottom:18px;">Exporting PDF...</div>
+            <div style="background:#151621;border-radius:8px;overflow:hidden;height:22px;margin-bottom:8px;">
+                <div id="pdf-progress-bar" style="background:#5870bf;height:100%;width:0%;transition:width 0.2s;"></div>
+            </div>
+            <div id="pdf-progress-label" style="color:#dadada;font-size:13px;text-align:center;">0%</div>
+        </div>
+    </div>
+
     <script>
         // Layouts
         cardLayouts = [
@@ -464,6 +518,16 @@
         const layoutPreview = document.getElementById('layout-preview');
         let layoutPreviewOpen = false;
 
+        function showPdfProgress(percent, label) {
+            document.getElementById('pdf-progress-container').style.display = 'flex';
+            document.getElementById('pdf-progress-bar').style.width = percent + '%';
+            document.getElementById('pdf-progress-label').textContent = (label || (percent + "%"));
+        }
+        function hidePdfProgress() {
+            document.getElementById('pdf-progress-container').style.display = 'none';
+        }
+
+
         layoutPreviewToggle.addEventListener('click', () => {
             layoutPreviewOpen = !layoutPreviewOpen;
             layoutPreview.style.display = layoutPreviewOpen ? 'block' : 'none';
@@ -474,7 +538,6 @@
             state.borderColor = e.target.value;
             updatePages();
         });
-
 
         // --- Layout Dropdown
         function updateLayoutDropdown() {
@@ -521,6 +584,48 @@
             };
             inp.click();
         });
+
+        document.getElementById('del-layout-btn').onclick = function () {
+            const current = state.cardLayout;
+            if (current === "Image Only") {
+                alert("Cannot delete the default layout.");
+                return;
+            }
+            if (!confirm(`Delete layout "${current}"? This cannot be undone.`)) return;
+            const idx = cardLayouts.findIndex(l => l.name === current);
+            if (idx > -1) {
+                cardLayouts.splice(idx, 1);
+                // Seleciona o primeiro layout disponível
+                state.cardLayout = cardLayouts[0].name;
+                updateLayoutDropdown();
+                layoutDropdown.value = state.cardLayout;
+                showLayoutPreview(state.cardLayout);
+                updatePages();
+            }
+        };
+
+        document.getElementById('edit-layout-btn').onclick = function () {
+            const current = state.cardLayout;
+            if (current === "Image Only") {
+                alert("Cannot rename the default layout.");
+                return;
+            }
+            const idx = cardLayouts.findIndex(l => l.name === current);
+            if (idx === -1) return;
+            const newName = prompt("Enter new layout name:", current);
+            if (!newName || newName.trim() === "" || newName === "Image Only") return;
+            if (cardLayouts.some(l => l.name === newName)) {
+                alert("A layout with this name already exists.");
+                return;
+            }
+            cardLayouts[idx].name = newName;
+            state.cardLayout = newName;
+            updateLayoutDropdown();
+            layoutDropdown.value = state.cardLayout;
+            showLayoutPreview(state.cardLayout);
+            updatePages();
+        };
+
 
         // --- Initial layout dropdown
         updateLayoutDropdown();
@@ -800,164 +905,187 @@
                 alert("Please upload card images before exporting PDF.");
                 return;
             }
-            const { PDFDocument, rgb } = PDFLib;
-            const pdfDoc = await PDFDocument.create();
-            const A4_WIDTH_MM = 297, A4_HEIGHT_MM = 210;
-            const pageWPt = A4_WIDTH_MM * 2.83465;
-            const pageHPt = A4_HEIGHT_MM * 2.83465;
-            const borderWPt = state.borderWidth * 2.83465;
-            const borderHPt = state.borderHeight * 2.83465;
-            const borderX = ((A4_WIDTH_MM - state.borderWidth) / 2) * 2.83465;
-            const borderY = ((A4_HEIGHT_MM - state.borderHeight) / 2) * 2.83465;
-            const cW = state.cardWidth;
-            const cH = state.cardHeight;
-            const cardWPt = cW * 2.83465;
-            const cardHPt = cH * 2.83465;
-            const cardsPerRow = Math.floor(state.borderWidth / cW);
-            const cardsPerCol = Math.floor(state.borderHeight / cH);
-            const cardsPerPage = cardsPerRow * cardsPerCol;
-            const totalPages = Math.ceil(state.fronts.length / cardsPerPage);
+            showPdfProgress(0, "Preparing PDF...");
+            try {
+                const { PDFDocument, rgb } = PDFLib;
+                const pdfDoc = await PDFDocument.create();
+                const A4_WIDTH_MM = 297, A4_HEIGHT_MM = 210;
+                const pageWPt = A4_WIDTH_MM * 2.83465;
+                const pageHPt = A4_HEIGHT_MM * 2.83465;
+                const borderWPt = state.borderWidth * 2.83465;
+                const borderHPt = state.borderHeight * 2.83465;
+                const borderX = ((A4_WIDTH_MM - state.borderWidth) / 2) * 2.83465;
+                const borderY = ((A4_HEIGHT_MM - state.borderHeight) / 2) * 2.83465;
+                const cW = state.cardWidth;
+                const cH = state.cardHeight;
+                const cardWPt = cW * 2.83465;
+                const cardHPt = cH * 2.83465;
+                const cardsPerRow = Math.floor(state.borderWidth / cW);
+                const cardsPerCol = Math.floor(state.borderHeight / cH);
+                const cardsPerPage = cardsPerRow * cardsPerCol;
+                const totalPages = Math.ceil(state.fronts.length / cardsPerPage);
 
-            function hexToRgbNorm(hex) {
-                hex = hex.replace(/^#/, '');
-                if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
-                const num = parseInt(hex, 16);
-                return [
-                    ((num >> 16) & 255) / 255,
-                    ((num >> 8) & 255) / 255,
-                    (num & 255) / 255
-                ];
-            }
-            const borderRgb = rgb(...hexToRgbNorm(state.borderColor));
-            const cutColor = rgb(...hexToRgbNorm(state.cutmarkColor));
-            const cutThickPt = (state.cutmarkThickness || 0.28) * 2.83465;
+                function hexToRgbNorm(hex) {
+                    hex = hex.replace(/^#/, '');
+                    if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+                    const num = parseInt(hex, 16);
+                    return [
+                        ((num >> 16) & 255) / 255,
+                        ((num >> 8) & 255) / 255,
+                        (num & 255) / 255
+                    ];
+                }
+                const borderRgb = rgb(...hexToRgbNorm(state.borderColor));
+                const cutColor = rgb(...hexToRgbNorm(state.cutmarkColor));
+                const cutThickPt = (state.cutmarkThickness || 0.28) * 2.83465;
 
-            for (let pageIndex = 0; pageIndex < totalPages; ++pageIndex) {
-                const page = pdfDoc.addPage([pageWPt, pageHPt]);
-                page.drawRectangle({
-                    x: borderX, y: borderY,
-                    width: borderWPt, height: borderHPt,
-                    borderColor: borderRgb, borderWidth: 0.43,
-                    color: rgb(1, 1, 1),
-                    opacity: 1
-                });
-                const x0 = borderX + (borderWPt - cardsPerRow * cardWPt) / 2;
-                const y0 = borderY + (borderHPt - cardsPerCol * cardHPt) / 2;
+                let doneCards = 0;
+                let totalCards = state.fronts.length;
 
-                for (let i = 0; i < cardsPerPage; ++i) {
-                    const globalIdx = pageIndex * cardsPerPage + i;
-                    if (globalIdx >= state.fronts.length) break;
-                    const imgObj = state.fronts[globalIdx];
-                    const row = Math.floor(i / cardsPerRow);
-                    const col = i % cardsPerRow;
-                    const x = x0 + col * cardWPt;
-                    const y = y0 + (cardsPerCol - row - 1) * cardHPt;
+                for (let pageIndex = 0; pageIndex < totalPages; ++pageIndex) {
+                    showPdfProgress(
+                        Math.round(100 * (doneCards / totalCards)),
+                        `Generating page ${pageIndex + 1} of ${totalPages}...`
+                    );
 
-                    let imgBytes, imgEmbed;
-                    if (state.cardLayout === "Image Only") {
-                        let imgBytes = await safeDataURLtoBytes(imgObj.dataURL);
-                        if (!imgBytes) {
-                            alert("Failed to load card image for PDF.");
-                            continue;
-                        }
-                        if (imgObj.dataURL.startsWith('data:image/png')) {
-                            imgEmbed = await pdfDoc.embedPng(imgBytes);
-                        } else if (imgObj.dataURL.startsWith('data:image/jpeg') || imgObj.dataURL.startsWith('data:image/jpg')) {
-                            imgEmbed = await pdfDoc.embedJpg(imgBytes);
-                        } else {
-                            imgEmbed = await pdfDoc.embedPng(imgBytes);
-                        }
-
-                    } else {
-                        let temp = document.createElement('div');
-                        temp.style.width = cW + 'mm';
-                        temp.style.height = cH + 'mm';
-                        temp.style.position = 'absolute';
-                        temp.style.left = '-10000px';
-                        temp.style.top = '0';
-                        temp.style.background = '#fff';
-                        let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
-                        temp.innerHTML = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
-                        document.body.appendChild(temp);
-                        let canvas = await html2canvas(temp, { backgroundColor: "#fff", width: temp.offsetWidth, height: temp.offsetHeight, scale: 4 });
-                        let dataUrl = canvas.toDataURL("image/png");
-                        document.body.removeChild(temp);
-                        let imgBytes = await safeDataURLtoBytes(dataUrl);
-                        if (!imgBytes) {
-                            alert("Failed to generate image for PDF.");
-                            continue;
-                        }
-                        imgEmbed = await pdfDoc.embedPng(imgBytes);
-                    }
-                    page.drawImage(imgEmbed, {
-                        x: x,
-                        y: y,
-                        width: cardWPt,
-                        height: cardHPt,
+                    const page = pdfDoc.addPage([pageWPt, pageHPt]);
+                    page.drawRectangle({
+                        x: borderX, y: borderY,
+                        width: borderWPt, height: borderHPt,
+                        borderColor: borderRgb, borderWidth: 0.43,
+                        color: rgb(1, 1, 1),
                         opacity: 1
                     });
-                }
+                    const x0 = borderX + (borderWPt - cardsPerRow * cardWPt) / 2;
+                    const y0 = borderY + (borderHPt - cardsPerCol * cardHPt) / 2;
 
-                // --- Cut marks PDF
-                if (state.cutmarksVisible[pageIndex]) {
-                    let startX = borderX + ((state.borderWidth - cardsPerRow * cW) / 2) * 2.83465;
-                    let startY = borderY + ((state.borderHeight - cardsPerCol * cH) / 2) * 2.83465;
-                    let positions = [];
-                    for (let r = 0; r <= cardsPerCol; ++r) {
-                        for (let c = 0; c <= cardsPerRow; ++c) {
-                            let xx = startX + c * cardWPt;
-                            let yy = startY + r * cardHPt;
-                            positions.push([xx, yy]);
+                    for (let i = 0; i < cardsPerPage; ++i) {
+                        const globalIdx = pageIndex * cardsPerPage + i;
+                        if (globalIdx >= state.fronts.length) break;
+                        const imgObj = state.fronts[globalIdx];
+                        const row = Math.floor(i / cardsPerRow);
+                        const col = i % cardsPerRow;
+                        const x = x0 + col * cardWPt;
+                        const y = y0 + (cardsPerCol - row - 1) * cardHPt;
+
+                        let imgBytes, imgEmbed;
+                        if (state.cardLayout === "Image Only") {
+                            let imgBytes = await safeDataURLtoBytes(imgObj.dataURL);
+                            if (!imgBytes) {
+                                alert("Failed to load card image for PDF.");
+                                continue;
+                            }
+                            if (imgObj.dataURL.startsWith('data:image/png')) {
+                                imgEmbed = await pdfDoc.embedPng(imgBytes);
+                            } else if (imgObj.dataURL.startsWith('data:image/jpeg') || imgObj.dataURL.startsWith('data:image/jpg')) {
+                                imgEmbed = await pdfDoc.embedJpg(imgBytes);
+                            } else {
+                                imgEmbed = await pdfDoc.embedPng(imgBytes);
+                            }
+                        } else {
+                            let temp = document.createElement('div');
+                            temp.style.width = cW + 'mm';
+                            temp.style.height = cH + 'mm';
+                            temp.style.position = 'absolute';
+                            temp.style.left = '-10000px';
+                            temp.style.top = '0';
+                            temp.style.background = '#fff';
+                            let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
+                            temp.innerHTML = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
+                            document.body.appendChild(temp);
+                            let canvas = await html2canvas(temp, { backgroundColor: "#fff", width: temp.offsetWidth, height: temp.offsetHeight, scale: 4 });
+                            let dataUrl = canvas.toDataURL("image/png");
+                            document.body.removeChild(temp);
+                            let imgBytes = await safeDataURLtoBytes(dataUrl);
+                            if (!imgBytes) {
+                                alert("Failed to generate image for PDF.");
+                                continue;
+                            }
+                            imgEmbed = await pdfDoc.embedPng(imgBytes);
+                        }
+                        page.drawImage(imgEmbed, {
+                            x: x,
+                            y: y,
+                            width: cardWPt,
+                            height: cardHPt,
+                            opacity: 1
+                        });
+
+                        doneCards++;
+                        // Atualize o progresso a cada carta processada
+                        if (totalCards > 0) {
+                            showPdfProgress(
+                                Math.min(99, Math.round(100 * (doneCards / totalCards))),
+                                `Processing card ${doneCards} of ${totalCards}...`
+                            );
                         }
                     }
-                    if (state.cutmarkType === "cross") {
-                        for (let [xx, yy] of positions) {
-                            page.drawLine({
-                                start: { x: xx, y: yy - 2.5 },
-                                end: { x: xx, y: yy + 2.5 },
-                                thickness: cutThickPt,
-                                color: cutColor,
-                            });
-                            page.drawLine({
-                                start: { x: xx - 2.5, y: yy },
-                                end: { x: xx + 2.5, y: yy },
-                                thickness: cutThickPt,
-                                color: cutColor,
-                            });
-                        }
-                    } else if (state.cutmarkType === "line") {
+
+                    // Cut marks
+                    if (state.cutmarksVisible[pageIndex]) {
+                        let startX = borderX + ((state.borderWidth - cardsPerRow * cW) / 2) * 2.83465;
+                        let startY = borderY + ((state.borderHeight - cardsPerCol * cH) / 2) * 2.83465;
+                        let positions = [];
                         for (let r = 0; r <= cardsPerCol; ++r) {
-                            let yy = startY + r * cardHPt;
-                            let xx1 = startX, xx2 = startX + cardsPerRow * cardWPt;
-                            page.drawLine({
-                                start: { x: xx1, y: yy },
-                                end: { x: xx2, y: yy },
-                                thickness: cutThickPt,
-                                color: cutColor,
-                            });
+                            for (let c = 0; c <= cardsPerRow; ++c) {
+                                let xx = startX + c * cardWPt;
+                                let yy = startY + r * cardHPt;
+                                positions.push([xx, yy]);
+                            }
                         }
-                        for (let c = 0; c <= cardsPerRow; ++c) {
-                            let xx = startX + c * cardWPt;
-                            let yy1 = startY, yy2 = startY + cardsPerCol * cardHPt;
-                            page.drawLine({
-                                start: { x: xx, y: yy1 },
-                                end: { x: xx, y: yy2 },
-                                thickness: cutThickPt,
-                                color: cutColor,
-                            });
+                        if (state.cutmarkType === "cross") {
+                            for (let [xx, yy] of positions) {
+                                page.drawLine({
+                                    start: { x: xx, y: yy - 2.5 },
+                                    end: { x: xx, y: yy + 2.5 },
+                                    thickness: cutThickPt,
+                                    color: cutColor,
+                                });
+                                page.drawLine({
+                                    start: { x: xx - 2.5, y: yy },
+                                    end: { x: xx + 2.5, y: yy },
+                                    thickness: cutThickPt,
+                                    color: cutColor,
+                                });
+                            }
+                        } else if (state.cutmarkType === "line") {
+                            for (let r = 0; r <= cardsPerCol; ++r) {
+                                let yy = startY + r * cardHPt;
+                                let xx1 = startX, xx2 = startX + cardsPerRow * cardWPt;
+                                page.drawLine({
+                                    start: { x: xx1, y: yy },
+                                    end: { x: xx2, y: yy },
+                                    thickness: cutThickPt,
+                                    color: cutColor,
+                                });
+                            }
+                            for (let c = 0; c <= cardsPerRow; ++c) {
+                                let xx = startX + c * cardWPt;
+                                let yy1 = startY, yy2 = startY + cardsPerCol * cardHPt;
+                                page.drawLine({
+                                    start: { x: xx, y: yy1 },
+                                    end: { x: xx, y: yy2 },
+                                    thickness: cutThickPt,
+                                    color: cutColor,
+                                });
+                            }
                         }
                     }
                 }
+
+                showPdfProgress(100, "Finalizing PDF...");
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                hidePdfProgress();
+            } catch (e) {
+                hidePdfProgress();
+                alert("Error exporting PDF: " + e.message);
             }
-
-            const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank'); // abre em uma nova aba
-            // Opcional: depois de um tempo, liberar o objeto
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-
         };
+
 
         // --- Save/Load Project
         function dataURLToBlob(dataURL) {
