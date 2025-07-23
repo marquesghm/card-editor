@@ -502,6 +502,9 @@
             cardLayout: "Image Only"
         };
 
+        let csvRawText = ""; // global
+        let csvFileName = ""; // global
+
         // DOM refs
         const frontsInput = document.getElementById('fronts-input');
         const frontsPreview = document.getElementById('fronts-preview');
@@ -1202,8 +1205,13 @@
                 borderColor: state.borderColor,
                 fronts: state.fronts.map(f => ({ name: f.name, file: `fronts/${f.name}` })),
                 layouts: cardLayouts.map(l => ({ name: l.name, file: `layouts/${l.name}.html` })),
+                csvData: cardData // Salva os textos já processados do CSV
             };
             zip.file("project.json", JSON.stringify(data));
+            // Salva o CSV usando o nome original, se existir
+            if (csvRawText && csvFileName) {
+                zip.file(csvFileName, csvRawText);
+            }
             for (let f of state.fronts) {
                 zip.file(`fronts/${f.name}`, dataURLToBlob(f.dataURL));
             }
@@ -1269,6 +1277,12 @@
                         cardLayouts.push({ name: l.name, html });
                     }
                 }
+
+                if (data.csvData) {
+                    cardData = data.csvData;
+                    updateCSVInputVisibility();
+                }
+
                 updateLayoutDropdown();
                 layoutDropdown.value = state.cardLayout;
                 showLayoutPreview(state.cardLayout);
@@ -1310,6 +1324,8 @@
             const file = e.target.files[0];
             const text = await file.text();
             cardData = parseCSV(text);
+            csvRawText = text;
+            csvFileName = file.name; // guarda o nome do arquivo CSV
             updatePages();
         });
 
