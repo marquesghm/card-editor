@@ -410,6 +410,10 @@
                     </div>
                     <div id="layout-preview" style="display:none;"></div>
                 </div>
+                <div id="csv-upload-section" class="sidebar-section" style="display:none;">
+                    <label>Card Data (CSV)</label>
+                    <input type="file" id="csv-input" accept=".csv,text/csv">
+                </div>
             </div>
             <div class="sidebar-section">
                 <label>Card Size (mm)</label>
@@ -564,6 +568,7 @@
             layoutPreviewArrow.textContent = '▼';
             updatePages();
         });
+
         addLayoutBtn.addEventListener('click', function () {
             let inp = document.createElement('input');
             inp.type = "file";
@@ -845,7 +850,8 @@
                     if (cardsForPage[i]) {
                         let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
                         // Replace CARD_IMAGE with actual image
-                        let rendered = cardHtml.replace(/CARD_IMAGE/g, cardsForPage[i].dataURL);
+                        let csvRow = cardData[i + p * cardsPerPage] || {};
+                        let rendered = renderCardHTML(cardHtml, cardsForPage[i].dataURL, csvRow);
                         slot.innerHTML = rendered;
                     }
                     grid.appendChild(slot);
@@ -1018,7 +1024,8 @@
                         const x = x0 + col * cardWPt;
                         const y = y0 + (cardsPerCol - row - 1) * cardHPt;
 
-                        let imgBytes, imgEmbed;
+                        let imgEmbed;
+
                         if (state.cardLayout === "Image Only") {
                             let imgBytes = await safeDataURLtoBytes(imgObj.dataURL);
                             if (!imgBytes) {
@@ -1041,13 +1048,14 @@
                             temp.style.top = '0';
                             temp.style.background = '#fff';
                             let cardHtml = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
-                            cardHtml = cardHtml.replace(/CARD_IMAGE/g, imgObj.dataURL);
+                            let csvRow = cardData[globalIdx] || {};
+                            let rendered = renderCardHTML(cardHtml, imgObj.dataURL, csvRow);
 
                             // Substitui todas as <img src="URL_HTTP"> externas por base64:
                             const imgRegex = /<img([^>]+)src=['"]([^'"]+)['"]([^>]*)>/gi;
                             const externalImgs = [];
                             let match;
-                            while ((match = imgRegex.exec(cardHtml)) !== null) {
+                            while ((match = imgRegex.exec(rendered)) !== null) {
                                 const url = match[2];
                                 if (url.startsWith('http')) {
                                     externalImgs.push({ full: match[0], url });
@@ -1058,19 +1066,19 @@
                                 try {
                                     const base64 = await urlToBase64(ext.url);
                                     const imgTagBase64 = ext.full.replace(ext.url, base64);
-                                    cardHtml = cardHtml.replace(ext.full, imgTagBase64);
+                                    rendered = rendered.replace(ext.full, imgTagBase64);
                                 } catch (e) {
-                                    // Se não conseguir carregar, pode remover ou ignorar
-                                    cardHtml = cardHtml.replace(ext.full, '');
+                                    rendered = rendered.replace(ext.full, '');
                                 }
                             }
 
-                            temp.innerHTML = cardHtml;
+                            temp.innerHTML = rendered;
 
                             document.body.appendChild(temp);
                             let canvas = await html2canvas(temp, { backgroundColor: "#fff", width: temp.offsetWidth, height: temp.offsetHeight, scale: 4 });
                             let dataUrl = canvas.toDataURL("image/png");
                             document.body.removeChild(temp);
+
                             let imgBytes = await safeDataURLtoBytes(dataUrl);
                             if (!imgBytes) {
                                 alert("Failed to generate image for PDF.");
@@ -1269,6 +1277,57 @@
             };
             inp.click();
         };
+
+        let cardData = []; // array de objetos {id:..., field1:..., field2:...}
+
+        function parseCSV(text) {
+            const [header, ...lines] = text.trim().split(/\r?\n/);
+            const keys = header.split(';');
+            return lines.map(line => {
+                const values = line.split(';');
+                let obj = {};
+                keys.forEach((k, i) => obj[k.trim()] = (values[i] || '').trim());
+                return obj;
+            });
+        }
+
+        // Adiciona input de CSV quando layout com data-field é selecionado
+        function updateCSVInputVisibility() {
+            let hasDataField = true;
+            let html = cardLayouts.find(l => l.name === state.cardLayout)?.html || "";
+            if (html.includes('data-field="')) hasDataField = true;
+            document.getElementById('csv-upload-section').style.display = hasDataField ? "block" : "none";
+        }
+
+        layoutDropdown.addEventListener('change', updateCSVInputVisibility);
+        addLayoutBtn.addEventListener('click', updateCSVInputVisibility);
+        // Chamar também no início
+        updateCSVInputVisibility();
+
+        // Lê CSV e guarda em cardData
+        document.getElementById('csv-input').addEventListener('change', async (e) => {
+            if (!e.target.files.length) return;
+            const file = e.target.files[0];
+            const text = await file.text();
+            cardData = parseCSV(text);
+            updatePages();
+        });
+
+        // Ao renderizar a carta, substitui os campos data-field
+        function renderCardHTML(cardHtml, imgDataUrl, row) {
+            let html = cardHtml.replace(/CARD_IMAGE/g, imgDataUrl);
+            if (!html.includes('data-field="')) return html;
+
+            let container = document.createElement('div');
+            container.innerHTML = html;
+            container.querySelectorAll('[data-field]').forEach(el => {
+                let field = el.getAttribute('data-field');
+                if (row && row[field] !== undefined) el.textContent = row[field];
+            });
+            return container.innerHTML;
+        }
+
+
 
 
         // --- Render inicial
